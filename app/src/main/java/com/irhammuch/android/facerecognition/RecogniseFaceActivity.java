@@ -4,7 +4,6 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
@@ -47,7 +46,6 @@ import com.google.mlkit.vision.face.Face;
 import com.google.mlkit.vision.face.FaceDetection;
 import com.google.mlkit.vision.face.FaceDetector;
 
-import org.json.JSONObject;
 import org.tensorflow.lite.Interpreter;
 
 import java.io.ByteArrayOutputStream;
@@ -65,7 +63,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-public class RegisterFaceActivity extends AppCompatActivity {
+public class RecogniseFaceActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final int PERMISSION_CODE = 1001;
     private static final String CAMERA_PERMISSION = Manifest.permission.CAMERA;
@@ -90,30 +88,36 @@ public class RegisterFaceActivity extends AppCompatActivity {
     private static final int INPUT_SIZE = 112;
     private static final int OUTPUT_SIZE=192;
 
-    private void goToRecognitionScreen(String userName, SimilarityClassifier.Recognition result) {
-        Map<Integer, Object> outputMap = new HashMap<>();
-        outputMap.put(0, embeddings);
+    private String[] getEmbeddings() {
+        Bundle extras = getIntent().getExtras();
+        String[] ret = new String[2];
+        if (extras != null) {
+            String userName = extras.getString("userName");
+            String result = extras.getString("result");
 
-        JSONObject obj = new JSONObject(outputMap);
+            ret[0] = userName;
+            ret[1] = result;
+            return ret;
+        } else {
+            throw new java.lang.RuntimeException("Could not find embeddings in local storage");
+        }
 
+    }
+
+    private void switchActivities() {
         Intent switchActivityIntent = new Intent(this, RecogniseFaceActivity.class);
-        switchActivityIntent.putExtra("userName", userName);
-        switchActivityIntent.putExtra("result", obj.toString());
         startActivity(switchActivityIntent);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_register_face);
+        setContentView(R.layout.activity_recognise_face);
         previewView = findViewById(R.id.previewView);
         previewView.setScaleType(PreviewView.ScaleType.FIT_CENTER);
         graphicOverlay = findViewById(R.id.graphic_overlay);
         previewImg = findViewById(R.id.preview_img);
         detectionTextView = findViewById(R.id.detection_text);
-
-        ImageButton addBtn = findViewById(R.id.add_btn);
-        addBtn.setOnClickListener((v -> addFace()));
 
         ImageButton switchCamBtn = findViewById(R.id.switch_camera);
         switchCamBtn.setOnClickListener((view -> switchCamera()));
@@ -287,63 +291,15 @@ public class RegisterFaceActivity extends AppCompatActivity {
                     boundingBox);
 
             if(start) name = recognizeImage(bitmap);
-            if(name != null) detectionTextView.setText(name);
+            if(name != null) {
+                detectionTextView.setText(name);
+            }
         }
         else {
             detectionTextView.setText(R.string.no_face_detected);
         }
 
         graphicOverlay.draw(boundingBox, scaleX, scaleY, name);
-    }
-
-    /** Recognize Processor */
-    private void addFace() {
-        start=false;
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Enter Name");
-
-        // Set up the input
-        final EditText input = new EditText(this);
-
-        input.setInputType(InputType.TYPE_CLASS_TEXT );
-        input.setMaxWidth(200);
-        builder.setView(input);
-
-        // Set up the buttons
-        builder.setPositiveButton("ADD", (dialog, which) -> {
-            //Toast.makeText(context, input.getText().toString(), Toast.LENGTH_SHORT).show();
-
-            //Create and Initialize new object with Face embeddings and Name.
-            SimilarityClassifier.Recognition result = new SimilarityClassifier.Recognition(
-                    "0", "", -1f);
-            result.setExtra(embeddings);
-
-            String userName = input.getText().toString();
-            registered.put( userName, result);
-            start = true;
-
-            // save the embeddings
-
-            //SharedPreferences settings = getApplicationContext().getSharedPreferences(PREFS_NAME, 0);
-            //SharedPreferences.Editor editor = settings.edit();
-            //editor.putInt("homeScore", YOUR_HOME_SCORE);
-
-            // Apply the edits!
-            //editor.apply();
-
-            // Get from the SharedPreferences
-            //SharedPreferences settings = getApplicationContext().getSharedPreferences(PREFS_NAME, 0);
-            //int homeScore = settings.getInt("homeScore", 0);
-
-            goToRecognitionScreen(userName, result);
-
-        });
-        builder.setNegativeButton("Cancel", (dialog, which) -> {
-            start = true;
-            dialog.cancel();
-        });
-
-        builder.show();
     }
 
     public String recognizeImage(final Bitmap bitmap) {
@@ -387,6 +343,10 @@ public class RegisterFaceActivity extends AppCompatActivity {
 
         float distance;
 
+        // read registered face from local storage
+        String[] embeddings = getEmbeddings();
+        String userName = embeddings[0];
+        String embedding = embeddings[1];
         //Compare new face with saved Faces.
         if (registered.size() > 0) {
 
@@ -606,7 +566,7 @@ public class RegisterFaceActivity extends AppCompatActivity {
         try {
             //model name
             String modelFile = "mobile_face_net.tflite";
-            tfLite = new Interpreter(loadModelFile(RegisterFaceActivity.this, modelFile));
+            tfLite = new Interpreter(loadModelFile(RecogniseFaceActivity.this, modelFile));
         } catch (IOException e) {
             e.printStackTrace();
         }
