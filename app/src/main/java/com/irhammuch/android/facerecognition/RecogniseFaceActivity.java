@@ -48,6 +48,7 @@ import com.google.mlkit.vision.face.FaceDetector;
 
 import org.tensorflow.lite.Interpreter;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -56,12 +57,20 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectInputStream;
+//import org.apache.commons.codec.DecoderException;
+//import org.apache.commons.codec.binary.Base64;
+//import org.apache.commons.codec.binary.Hex;
 
 public class RecogniseFaceActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -88,16 +97,31 @@ public class RecogniseFaceActivity extends AppCompatActivity {
     private static final int INPUT_SIZE = 112;
     private static final int OUTPUT_SIZE=192;
 
-    private String[] getEmbeddings() {
+    /*private float[] stringToArray(String str) throws IOException, ClassNotFoundException, DecoderException {
+        // deserialize
+        ByteArrayInputStream in = new ByteArrayInputStream(Hex.decodeHex(str.toCharArray()));
+        return Arrays.toString((String[]) new ObjectInputStream(in).readObject());
+    }*/
+
+    private void goToBroadcastScreen() {
+        Intent switchActivityIntent = new Intent(this, BLEBroadcastActivity.class);
+        startActivity(switchActivityIntent);
+    }
+
+    private String loadEmbeddingsFromStorage() {
         Bundle extras = getIntent().getExtras();
         String[] ret = new String[2];
         if (extras != null) {
             String userName = extras.getString("userName");
-            String result = extras.getString("result");
+            float[] embedding = extras.getFloatArray("embedding");
+            embeddings = new float[1][OUTPUT_SIZE];
+            embeddings[0] = embedding;
 
-            ret[0] = userName;
-            ret[1] = result;
-            return ret;
+            SimilarityClassifier.Recognition result = new SimilarityClassifier.Recognition("0", "", -1f);
+            result.setExtra(embeddings);
+            registered.put(userName, result);
+
+            return userName;
         } else {
             throw new java.lang.RuntimeException("Could not find embeddings in local storage");
         }
@@ -196,7 +220,7 @@ public class RecogniseFaceActivity extends AppCompatActivity {
 
         Preview.Builder builder = new Preview.Builder();
         builder.setTargetAspectRatio(AspectRatio.RATIO_4_3);
-        builder.setTargetRotation(getRotation());
+        //builder.setTargetRotation(getRotation());
 
         previewUseCase = builder.build();
         previewUseCase.setSurfaceProvider(previewView.getSurfaceProvider());
@@ -222,7 +246,7 @@ public class RecogniseFaceActivity extends AppCompatActivity {
 
         ImageAnalysis.Builder builder = new ImageAnalysis.Builder();
         builder.setTargetAspectRatio(AspectRatio.RATIO_4_3);
-        builder.setTargetRotation(getRotation());
+        //builder.setTargetRotation(getRotation());
 
         analysisUseCase = builder.build();
         analysisUseCase.setAnalyzer(cameraExecutor, this::analyze);
@@ -290,9 +314,18 @@ public class RecogniseFaceActivity extends AppCompatActivity {
                     inputImage.getRotationDegrees(),
                     boundingBox);
 
-            if(start) name = recognizeImage(bitmap);
+            // set image to preview
+            previewImg.setImageBitmap(bitmap);
+
+            // read registered face from local storage
+            String userName = loadEmbeddingsFromStorage();
+
+            name = recogniseFace(bitmap);
             if(name != null) {
                 detectionTextView.setText(name);
+                if(name == userName) {
+                    goToBroadcastScreen();
+                }
             }
         }
         else {
@@ -302,10 +335,8 @@ public class RecogniseFaceActivity extends AppCompatActivity {
         graphicOverlay.draw(boundingBox, scaleX, scaleY, name);
     }
 
-    public String recognizeImage(final Bitmap bitmap) {
-        // set image to preview
-        previewImg.setImageBitmap(bitmap);
-
+    public String recogniseFace(final Bitmap bitmap) {
+        
         //Create ByteBuffer to store normalized image
 
         ByteBuffer imgData = ByteBuffer.allocateDirect(INPUT_SIZE * INPUT_SIZE * 3 * 4);
@@ -332,21 +363,14 @@ public class RecogniseFaceActivity extends AppCompatActivity {
 
         Map<Integer, Object> outputMap = new HashMap<>();
 
+        float[][] currentEmbeddings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
 
-        embeddings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
-
-        outputMap.put(0, embeddings);
+        outputMap.put(0, currentEmbeddings);
 
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap); //Run model
-
-
-
+        
         float distance;
 
-        // read registered face from local storage
-        String[] embeddings = getEmbeddings();
-        String userName = embeddings[0];
-        String embedding = embeddings[1];
         //Compare new face with saved Faces.
         if (registered.size() > 0) {
 
