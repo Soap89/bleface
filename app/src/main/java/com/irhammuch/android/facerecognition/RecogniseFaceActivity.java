@@ -324,7 +324,20 @@ public class RecogniseFaceActivity extends AppCompatActivity {
             if(name != null) {
                 detectionTextView.setText(name);
                 if(name == userName) {
-                    goToBroadcastScreen();
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setTitle("Success");
+                    builder.setMessage("Identity verification passed successfully. Are you sure you want to unlock the facility?");
+
+                    // Set up the buttons
+                    builder.setPositiveButton("Yes", (dialog, which) -> {
+                        goToBroadcastScreen();
+
+                    });
+                    builder.setNegativeButton("No", (dialog, which) -> {
+                        dialog.cancel();
+                    });
+
+                    builder.show();
                 }
             }
         }

@@ -135,6 +135,17 @@ public class RegisterFaceActivity extends AppCompatActivity {
         switchCamBtn.setOnClickListener((view -> switchCamera()));
 
         loadModel();
+
+        // show instructions
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Instructions");
+        builder.setMessage("Please look straight into the camera and press the button at the bottom to register your face.");
+
+        // Set up the buttons
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            dialog.cancel();
+        });
+        builder.show();
     }
 
     @Override
