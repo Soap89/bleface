@@ -11,10 +11,13 @@
         <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/roundedcorner.xml" value="0.11296296296296296" />
         <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/white_roundedcorner.xml" value="0.11296296296296296" />
         <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/layout/activity_main.xml" value="0.1" />
-        <entry key="..\:/Users/downloads/yerke/android-face-recognition-master/app/src/main/res/layout/activity_ble_broadcast.xml" value="0.18802083333333333" />
+        <entry key="..\:/Users/downloads/yerke/android-face-recognition-master/app/src/main/res/layout/activity_ble_broadcast.xml" value="0.25" />
         <entry key="..\:/Users/downloads/yerke/android-face-recognition-master/app/src/main/res/layout/activity_main.xml" value="0.358695652173913" />
         <entry key="..\:/Users/downloads/yerke/android-face-recognition-master/app/src/main/res/layout/activity_recognise_face.xml" value="0.358695652173913" />
         <entry key="..\:/Users/downloads/yerke/android-face-recognition-master/app/src/main/res/layout/activity_register_face.xml" value="0.358695652173913" />
+        <entry key="..\:/Users/downloads/yerke/sportify/app/src/main/res/layout/activity_ble_broadcast.xml" value="0.3009833262077811" />
+        <entry key="..\:/Users/downloads/yerke/sportify/app/src/main/res/layout/activity_recognise_face.xml" value="0.18802083333333333" />
+        <entry key="..\:/Users/downloads/yerke/sportify/app/src/main/res/layout/activity_register_face.xml" value="0.18802083333333333" />
       </map>
     </option>
   </component>

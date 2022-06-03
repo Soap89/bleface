@@ -1,4 +1,4 @@
-package com.irhammuch.android.facerecognition;
+package com.example.android.sportify;
 
 import android.content.Context;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.irhammuch.android.facerecognition", appContext.getPackageName());
+        assertEquals("com.example.android.sportify", appContext.getPackageName());
     }
 }

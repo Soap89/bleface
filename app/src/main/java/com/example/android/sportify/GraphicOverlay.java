@@ -1,4 +1,4 @@
-package com.irhammuch.android.facerecognition;
+package com.example.android.sportify;
 
 import android.content.Context;
 import android.graphics.Canvas;

@@ -1,4 +1,4 @@
-package com.irhammuch.android.facerecognition;
+package com.example.android.sportify;
 
 import org.junit.Test;
 

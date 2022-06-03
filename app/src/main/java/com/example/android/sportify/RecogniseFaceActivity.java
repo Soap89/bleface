@@ -1,10 +1,9 @@
-package com.irhammuch.android.facerecognition;
+package com.example.android.sportify;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
@@ -19,15 +18,12 @@ import android.graphics.RectF;
 import android.graphics.YuvImage;
 import android.media.Image;
 import android.os.Bundle;
-import android.text.InputType;
 import android.util.Log;
 import android.util.Pair;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.Button;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -48,7 +44,6 @@ import com.google.mlkit.vision.face.Face;
 import com.google.mlkit.vision.face.FaceDetection;
 import com.google.mlkit.vision.face.FaceDetector;
 
-import org.json.JSONObject;
 import org.tensorflow.lite.Interpreter;
 
 import java.io.ByteArrayOutputStream;
@@ -59,42 +54,34 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.io.ByteArrayOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectInputStream;
 //import org.apache.commons.codec.DecoderException;
 //import org.apache.commons.codec.binary.Base64;
 //import org.apache.commons.codec.binary.Hex;
 
-public class RegisterFaceActivity extends AppCompatActivity {
+public class RecogniseFaceActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final int PERMISSION_CODE = 1001;
     private static final String CAMERA_PERMISSION = Manifest.permission.CAMERA;
     private PreviewView previewView;
     private CameraSelector cameraSelector;
     private ProcessCameraProvider cameraProvider;
-    private int lensFacing = CameraSelector.LENS_FACING_BACK;
+    private int lensFacing = CameraSelector.LENS_FACING_FRONT;
     private Preview previewUseCase;
     private ImageAnalysis analysisUseCase;
     private GraphicOverlay graphicOverlay;
     private ImageView previewImg;
     private TextView detectionTextView;
-    private ImageButton addBtn;
 
     private final HashMap<String, SimilarityClassifier.Recognition> registered = new HashMap<>(); //saved Faces
     private Interpreter tfLite;
     private boolean flipX = false;
-    private boolean detected = false;
-
+    private boolean start = true;
     private float[][] embeddings;
 
     private static final float IMAGE_MEAN = 128.0f;
@@ -102,50 +89,56 @@ public class RegisterFaceActivity extends AppCompatActivity {
     private static final int INPUT_SIZE = 112;
     private static final int OUTPUT_SIZE=192;
 
-    /*public void arrayToString(float[] arr) throws IOException, ClassNotFoundException, DecoderException {
-        // serialize
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        new ObjectOutputStream(out).writeObject(arr);
-
-        // convert to string
-        return new String(Hex.encodeHex(out.toByteArray()));
+    /*private float[] stringToArray(String str) throws IOException, ClassNotFoundException, DecoderException {
+        // deserialize
+        ByteArrayInputStream in = new ByteArrayInputStream(Hex.decodeHex(str.toCharArray()));
+        return Arrays.toString((String[]) new ObjectInputStream(in).readObject());
     }*/
 
-    private void goToRecognitionScreen(String userName) {
+    private void goToBroadcastScreen() {
+        Intent switchActivityIntent = new Intent(this, BLEBroadcastActivity.class);
+        startActivity(switchActivityIntent);
+    }
+
+    private String loadEmbeddingsFromStorage() {
+        Bundle extras = getIntent().getExtras();
+        String[] ret = new String[2];
+        if (extras != null) {
+            String userName = extras.getString("userName");
+            float[] embedding = extras.getFloatArray("embedding");
+            embeddings = new float[1][OUTPUT_SIZE];
+            embeddings[0] = embedding;
+
+            SimilarityClassifier.Recognition result = new SimilarityClassifier.Recognition("0", "", -1f);
+            result.setExtra(embeddings);
+            registered.put(userName, result);
+
+            return userName;
+        } else {
+            throw new java.lang.RuntimeException("Could not find embeddings in local storage");
+        }
+
+    }
+
+    private void switchActivities() {
         Intent switchActivityIntent = new Intent(this, RecogniseFaceActivity.class);
-        switchActivityIntent.putExtra("userName", userName);
-        switchActivityIntent.putExtra("embedding", embeddings[0]);
         startActivity(switchActivityIntent);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_register_face);
+        setContentView(R.layout.activity_recognise_face);
         previewView = findViewById(R.id.previewView);
         previewView.setScaleType(PreviewView.ScaleType.FIT_CENTER);
         graphicOverlay = findViewById(R.id.graphic_overlay);
         previewImg = findViewById(R.id.preview_img);
         detectionTextView = findViewById(R.id.detection_text);
-        //addBtn = findViewById(R.id.add_btn);
-        ImageButton addBtn = findViewById(R.id.add_btn);
-        addBtn.setOnClickListener((v -> registerFace()));
 
         ImageButton switchCamBtn = findViewById(R.id.switch_camera);
         switchCamBtn.setOnClickListener((view -> switchCamera()));
 
         loadModel();
-
-        // show instructions
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Instructions");
-        builder.setMessage("Please look straight into the camera and press the button at the bottom to register your face.");
-
-        // Set up the buttons
-        builder.setPositiveButton("OK", (dialog, which) -> {
-            dialog.cancel();
-        });
-        builder.show();
     }
 
     @Override
@@ -219,7 +212,7 @@ public class RegisterFaceActivity extends AppCompatActivity {
 
         Preview.Builder builder = new Preview.Builder();
         builder.setTargetAspectRatio(AspectRatio.RATIO_4_3);
-        builder.setTargetRotation(getRotation());
+        //builder.setTargetRotation(getRotation());
 
         previewUseCase = builder.build();
         previewUseCase.setSurfaceProvider(previewView.getSurfaceProvider());
@@ -245,7 +238,7 @@ public class RegisterFaceActivity extends AppCompatActivity {
 
         ImageAnalysis.Builder builder = new ImageAnalysis.Builder();
         builder.setTargetAspectRatio(AspectRatio.RATIO_4_3);
-        builder.setTargetRotation(getRotation());
+        //builder.setTargetRotation(getRotation());
 
         analysisUseCase = builder.build();
         analysisUseCase.setAnalyzer(cameraExecutor, this::analyze);
@@ -290,25 +283,16 @@ public class RegisterFaceActivity extends AppCompatActivity {
         faceDetector.process(inputImage)
                 .addOnSuccessListener(faces -> onSuccessListener(faces, inputImage))
                 .addOnFailureListener(e -> Log.e(TAG, "Barcode process failure", e))
-                .addOnCompleteListener(task -> onCompleteListener(image));//image.close());
-    }
-
-    private void onCompleteListener(ImageProxy image) {
-        image.close();
-        /*if(detected) {
-
-        }*/
+                .addOnCompleteListener(task -> image.close());
     }
 
     private void onSuccessListener(List<Face> faces, InputImage inputImage) {
         Rect boundingBox = null;
+        String name = null;
         float scaleX = (float) previewView.getWidth() / (float) inputImage.getHeight();
         float scaleY = (float) previewView.getHeight() / (float) inputImage.getWidth();
 
         if(faces.size() > 0) {
-            detected = true;
-            System.out.println("Face detected!");
-            detectionTextView.setText(R.string.face_detected);
 
             // get first face detected
             Face face = faces.get(0);
@@ -325,75 +309,37 @@ public class RegisterFaceActivity extends AppCompatActivity {
             // set image to preview
             previewImg.setImageBitmap(bitmap);
 
-            imgToEmbedding(bitmap);
-            System.out.println("Embedding retrieved: " + Arrays.toString(embeddings[0]));
-            //registerFace();
+            // read registered face from local storage
+            String userName = loadEmbeddingsFromStorage();
 
-            //if(start) name = recognizeImage(bitmap);
-            //if(name != null) detectionTextView.setText(name);
-        }
-        else {
-            detectionTextView.setText(R.string.no_face_detected);
+            name = recogniseFace(bitmap);
+            if(name != null) {
+                //detectionTextView.setText(name);
+                if(name == userName) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setTitle("Success");
+                    builder.setMessage("Identity verification passed successfully. Are you sure you want to unlock the facility?");
+
+                    // Set up the buttons
+                    builder.setPositiveButton("Yes", (dialog, which) -> {
+                        goToBroadcastScreen();
+
+                    });
+                    builder.setNegativeButton("No", (dialog, which) -> {
+                        dialog.cancel();
+                    });
+
+                    builder.show();
+                }
+            }
         }
 
-        graphicOverlay.draw(boundingBox, scaleX, scaleY, "");
+
+        graphicOverlay.draw(boundingBox, scaleX, scaleY, name);
     }
 
-    /** Recognize Processor */
-    private void registerFace() {
-        if(detected) {
-            // stop analysing
-            analysisUseCase.clearAnalyzer();
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Please enter your name: ");
-
-            // Set up the input
-            final EditText input = new EditText(this);
-
-            input.setInputType(InputType.TYPE_CLASS_TEXT );
-            input.setMaxWidth(200);
-            builder.setView(input);
-
-            // Set up the buttons
-            builder.setPositiveButton("Register", (dialog, which) -> {
-                //Toast.makeText(context, input.getText().toString(), Toast.LENGTH_SHORT).show();
-
-                //Create and Initialize new object with Face embeddings and Name.
-                //SimilarityClassifier.Recognition result = new SimilarityClassifier.Recognition("0", "", -1f);
-                //result.setExtra(embeddings);
-
-                String userName = input.getText().toString();
-                //registered.put(userName, result);
-
-                // save the embeddings
-
-                //SharedPreferences settings = getApplicationContext().getSharedPreferences(PREFS_NAME, 0);
-                //SharedPreferences.Editor editor = settings.edit();
-                //editor.putInt("homeScore", YOUR_HOME_SCORE);
-
-                // Apply the edits!
-                //editor.apply();
-
-                // Get from the SharedPreferences
-                //SharedPreferences settings = getApplicationContext().getSharedPreferences(PREFS_NAME, 0);
-                //int homeScore = settings.getInt("homeScore", 0);
-
-                goToRecognitionScreen(userName); // we assume embeddings have already been populated
-
-            });
-            builder.setNegativeButton("Cancel", (dialog, which) -> {
-                dialog.cancel();
-            });
-
-            builder.show();
-        } else {
-            Toast.makeText(RegisterFaceActivity.this, "No face detected yet", Toast.LENGTH_LONG).show();
-        }
-
-    }
-
-    public void imgToEmbedding(final Bitmap bitmap) {
+    public String recogniseFace(final Bitmap bitmap) {
+        
         //Create ByteBuffer to store normalized image
 
         ByteBuffer imgData = ByteBuffer.allocateDirect(INPUT_SIZE * INPUT_SIZE * 3 * 4);
@@ -420,12 +366,31 @@ public class RegisterFaceActivity extends AppCompatActivity {
 
         Map<Integer, Object> outputMap = new HashMap<>();
 
+        float[][] currentEmbeddings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
 
-        embeddings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
-
-        outputMap.put(0, embeddings);
+        outputMap.put(0, currentEmbeddings);
 
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap); //Run model
+        
+        float distance;
+
+        //Compare new face with saved Faces.
+        if (registered.size() > 0) {
+
+            final Pair<String, Float> nearest = findNearest(embeddings[0]);//Find closest matching face
+
+            if (nearest != null) {
+
+                final String name = nearest.first;
+                distance = nearest.second;
+                if(distance<1.000f) //If distance between Closest found face is more than 1.000 ,then output UNKNOWN face.
+                    return name;
+                else
+                    return "unknown";
+            }
+        }
+
+        return null;
     }
 
     //Compare Faces by distance between face embeddings
@@ -628,7 +593,7 @@ public class RegisterFaceActivity extends AppCompatActivity {
         try {
             //model name
             String modelFile = "mobile_face_net.tflite";
-            tfLite = new Interpreter(loadModelFile(RegisterFaceActivity.this, modelFile));
+            tfLite = new Interpreter(loadModelFile(RecogniseFaceActivity.this, modelFile));
         } catch (IOException e) {
             e.printStackTrace();
         }

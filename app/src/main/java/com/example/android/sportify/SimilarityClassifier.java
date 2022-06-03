@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-package com.irhammuch.android.facerecognition;
+package com.example.android.sportify;
 
 public interface SimilarityClassifier {
     /** An immutable result returned by a Classifier describing what was recognized. */
